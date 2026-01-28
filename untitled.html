@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radha Jaap with Music</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #ff9933, #ff5e62);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            color: white;
+            text-align: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 25px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        h1 { margin: 0; font-size: 3rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        
+        #counter {
+            font-size: 7rem;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 0px 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .status-box {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            font-size: 1rem;
+            min-height: 30px;
+        }
+
+        #transcript { color: #ffeebc; font-weight: bold; font-style: italic; }
+
+        button {
+            border: none;
+            padding: 18px 35px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 15px;
+            transition: transform 0.2s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        #startBtn { background: white; color: #ff5e62; }
+        #startBtn.active { background: #4CAF50; color: white; animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
+
+        /* YouTube Player Hidden */
+        #player-container {
+            position: absolute;
+            top: -9999px;
+            opacity: 0;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Radha Radha</h1>
+        <p style="opacity: 0.9;">Target: 108</p>
+
+        <div id="counter">0</div>
+
+        <div class="status-box">
+            Status: <span id="status">Ready</span><br>
+            Sun raha hu: <span id="transcript">...</span>
+        </div>
+
+        <button id="startBtn" onclick="toggleSystem()">▶️ Start Jaap & Music</button>
+        <p style="font-size: 12px; margin-top: 10px;">(Music will start automatically)</p>
+    </div>
+
+    <div id="player-container">
+        <div id="player"></div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const TARGET = 108;
+        const KEYWORDS = ['radha', 'radhe', 'rada', 'raadha', 'radar', 'aadha', 'ratha'];
+        // YouTube Video ID (Radha Dhun)
+        const YOUTUBE_VIDEO_ID = 'SRDByjsGQS4'; 
+
+        let count = 0;
+        let recognition;
+        let isRunning = false;
+        let player; // YouTube Player Object
+
+        const counterUI = document.getElementById('counter');
+        const statusUI = document.getElementById('status');
+        const transcriptUI = document.getElementById('transcript');
+        const startBtn = document.getElementById('startBtn');
+
+        // 1. YouTube API Setup
+        var tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        var firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                height: '200',
+                width: '200',
+                videoId: YOUTUBE_VIDEO_ID,
+                events: {
+                    'onReady': onPlayerReady
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            console.log("Music Ready");
+        }
+
+        // 2. Speech Recognition Setup
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'hi-IN';
+            recognition.interimResults = false;
+
+            recognition.onstart = function() {
+                statusUI.innerText = "Listening...";
+                startBtn.classList.add('active');
+            };
+
+            recognition.onend = function() {
+                if (isRunning && count < TARGET) {
+                    try { recognition.start(); } catch(e) {}
+                } else {
+                    startBtn.classList.remove('active');
+                }
+            };
+
+            recognition.onresult = function(event) {
+                const text = event.results[0][0].transcript.toLowerCase();
+                transcriptUI.innerText = text;
+
+                if (KEYWORDS.some(word => text.includes(word))) {
+                    addCount();
+                }
+            };
+        } else {
+            alert("Mic not supported in this browser.");
+        }
+
+        // 3. Main Toggle Function
+        function toggleSystem() {
+            if (!isRunning) {
+                // START
+                isRunning = true;
+                startBtn.innerHTML = "🛑 Stop & Pause";
+                
+                // Start Mic
+                try { recognition.start(); } catch(e) {}
+
+                // Start Music
+                if (player && player.playVideo) {
+                    player.playVideo();
+                }
+
+            } else {
+                // STOP
+                isRunning = false;
+                startBtn.innerHTML = "▶️ Resume Jaap";
+                statusUI.innerText = "Paused";
+                recognition.stop();
+                if (player && player.pauseVideo) {
+                    player.pauseVideo();
+                }
+            }
+        }
+
+        function addCount() {
+            if (count < TARGET) {
+                count++;
+                counterUI.innerText = count;
+                
+                // Animation
+                counterUI.style.transform = "scale(1.2)";
+                setTimeout(() => counterUI.style.transform = "scale(1)", 200);
+
+                if (count === TARGET) {
+                    completeSession();
+                }
+            }
+        }
+
+        function completeSession() {
+            isRunning = false;
+            recognition.stop();
+            if (player && player.stopVideo) {
+                player.stopVideo(); // Stop Music automatically
+            }
+            
+            startBtn.innerHTML = "🎉 108 Completed! Restart?";
+            startBtn.classList.remove('active');
+            statusUI.innerText = "Jai Shri Radha! 🙏";
+            transcriptUI.innerText = "Done.";
+            alert("Jai Shri Radha! 108 Jaap Pura Hua.");
+            
+            // Reset for next time
+            startBtn.onclick = function() { location.reload(); };
+        }
+
+    </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radha Jaap with Music</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #ff9933, #ff5e62);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            color: white;
+            text-align: center;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 25px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        h1 { margin: 0; font-size: 3rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        
+        #counter {
+            font-size: 7rem;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 0px 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .status-box {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            font-size: 1rem;
+            min-height: 30px;
+        }
+
+        #transcript { color: #ffeebc; font-weight: bold; font-style: italic; }
+
+        button {
+            border: none;
+            padding: 18px 35px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 15px;
+            transition: transform 0.2s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        #startBtn { background: white; color: #ff5e62; }
+        #startBtn.active { background: #4CAF50; color: white; animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
+
+        /* YouTube Player Hidden */
+        #player-container {
+            position: absolute;
+            top: -9999px;
+            opacity: 0;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Radha Radha</h1>
+        <p style="opacity: 0.9;">Target: 108</p>
+
+        <div id="counter">0</div>
+
+        <div class="status-box">
+            Status: <span id="status">Ready</span><br>
+            Sun raha hu: <span id="transcript">...</span>
+        </div>
+
+        <button id="startBtn" onclick="toggleSystem()">▶️ Start Jaap & Music</button>
+        <p style="font-size: 12px; margin-top: 10px;">(Music will start automatically)</p>
+    </div>
+
+    <div id="player-container">
+        <div id="player"></div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const TARGET = 108;
+        const KEYWORDS = ['radha', 'radhe', 'rada', 'raadha', 'radar', 'aadha', 'ratha'];
+        // YouTube Video ID (Radha Dhun)
+        const YOUTUBE_VIDEO_ID = 'SRDByjsGQS4'; 
+
+        let count = 0;
+        let recognition;
+        let isRunning = false;
+        let player; // YouTube Player Object
+
+        const counterUI = document.getElementById('counter');
+        const statusUI = document.getElementById('status');
+        const transcriptUI = document.getElementById('transcript');
+        const startBtn = document.getElementById('startBtn');
+
+        // 1. YouTube API Setup
+        var tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        var firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                height: '200',
+                width: '200',
+                videoId: YOUTUBE_VIDEO_ID,
+                events: {
+                    'onReady': onPlayerReady
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            console.log("Music Ready");
+        }
+
+        // 2. Speech Recognition Setup
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'hi-IN';
+            recognition.interimResults = false;
+
+            recognition.onstart = function() {
+                statusUI.innerText = "Listening...";
+                startBtn.classList.add('active');
+            };
+
+            recognition.onend = function() {
+                if (isRunning && count < TARGET) {
+                    try { recognition.start(); } catch(e) {}
+                } else {
+                    startBtn.classList.remove('active');
+                }
+            };
+
+            recognition.onresult = function(event) {
+                const text = event.results[0][0].transcript.toLowerCase();
+                transcriptUI.innerText = text;
+
+                if (KEYWORDS.some(word => text.includes(word))) {
+                    addCount();
+                }
+            };
+        } else {
+            alert("Mic not supported in this browser.");
+        }
+
+        // 3. Main Toggle Function
+        function toggleSystem() {
+            if (!isRunning) {
+                // START
+                isRunning = true;
+                startBtn.innerHTML = "🛑 Stop & Pause";
+                
+                // Start Mic
+                try { recognition.start(); } catch(e) {}
+
+                // Start Music
+                if (player && player.playVideo) {
+                    player.playVideo();
+                }
+
+            } else {
+                // STOP
+                isRunning = false;
+                startBtn.innerHTML = "▶️ Resume Jaap";
+                statusUI.innerText = "Paused";
+                recognition.stop();
+                if (player && player.pauseVideo) {
+                    player.pauseVideo();
+                }
+            }
+        }
+
+        function addCount() {
+            if (count < TARGET) {
+                count++;
+                counterUI.innerText = count;
+                
+                // Animation
+                counterUI.style.transform = "scale(1.2)";
+                setTimeout(() => counterUI.style.transform = "scale(1)", 200);
+
+                if (count === TARGET) {
+                    completeSession();
+                }
+            }
+        }
+
+        function completeSession() {
+            isRunning = false;
+            recognition.stop();
+            if (player && player.stopVideo) {
+                player.stopVideo(); // Stop Music automatically
+            }
+            
+            startBtn.innerHTML = "🎉 108 Completed! Restart?";
+            startBtn.classList.remove('active');
+            statusUI.innerText = "Jai Shri Radha! 🙏";
+            transcriptUI.innerText = "Done.";
+            alert("Jai Shri Radha! 108 Jaap Pura Hua.");
+            
+            // Reset for next time
+            startBtn.onclick = function() { location.reload(); };
+        }
+
+    </script>
+</body>
+</html>
+
+</body>
+</html>
